@@ -54,6 +54,8 @@ type InteractiveClient struct {
 	// NOTE: should ONLY be called by cancelActiveQueryIfAny
 	cancelActiveQuery context.CancelFunc
 	cancelPrompt      context.CancelFunc
+	// mutex to protect concurrent access to cancelActiveQuery
+	cancelMutex sync.Mutex
 
 	// channel used internally to pass the initialisation result
 	initResultChan chan *db_common.InitResult
