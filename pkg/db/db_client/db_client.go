@@ -53,6 +53,8 @@ type DbClient struct {
 	// if a custom search path or a prefix is used, store it here
 	customSearchPath []string
 	searchPathPrefix []string
+	// allows locked access to customSearchPath and searchPathPrefix
+	searchPathMutex *sync.Mutex
 	// the default user search path
 	userSearchPath []string
 	// disable timing - set whilst in process of querying the timing
@@ -70,6 +72,7 @@ func NewDbClient(ctx context.Context, connectionString string, opts ...ClientOpt
 		parallelSessionInitLock: semaphore.NewWeighted(constants.MaxParallelClientInits),
 		sessions:                make(map[uint32]*db_common.DatabaseSession),
 		sessionsMutex:           &sync.Mutex{},
+		searchPathMutex:         &sync.Mutex{},
 		connectionString:        connectionString,
 	}
 
