@@ -1,12 +1,15 @@
 package db_client
 
 import (
+	"context"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/turbot/steampipe/v2/pkg/db/db_common"
 )
 
 // TestSessionMapCleanupImplemented verifies that the session map memory leak is fixed
@@ -47,4 +50,36 @@ func TestSessionMapCleanupImplemented(t *testing.T) {
 		strings.Contains(clientCode, "BeforeClose")
 	assert.True(t, hasCleanupComment,
 		"Comment should document automatic cleanup mechanism")
+}
+
+// TestDbClient_ConcurrentClose tests concurrent Close() calls
+// BUG FOUND: Race condition in Close() - c.sessions = nil at line 171 is not protected by mutex
+func TestDbClient_ConcurrentClose(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping concurrent test in short mode")
+	}
+
+	ctx := context.Background()
+
+	client := &DbClient{
+		sessions:      make(map[uint32]*db_common.DatabaseSession),
+		sessionsMutex: &sync.Mutex{},
+	}
+
+	var wg sync.WaitGroup
+	numGoroutines := 10
+
+	// Call Close() from multiple goroutines simultaneously
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = client.Close(ctx)
+		}()
+	}
+
+	wg.Wait()
+
+	// Should not panic and sessions should be nil
+	assert.Nil(t, client.sessions)
 }
