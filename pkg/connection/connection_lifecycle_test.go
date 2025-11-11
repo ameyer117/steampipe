@@ -127,64 +127,64 @@ func TestLogRefreshConnectionResultsTypeAssertion(t *testing.T) {
 	}()
 
 	// Test case 1: viper.Get returns nil
-	t.Run("nil value causes panic", func(t *testing.T) {
+	t.Run("nil value does not panic", func(t *testing.T) {
 		viper.Set(constants.ConfigKeyActiveCommand, nil)
 
 		state := &refreshConnectionState{}
 
-		// This should panic with the current unsafe type assertion
+		// After the fix, this should NOT panic
 		defer func() {
 			if r := recover(); r != nil {
-				t.Logf("Expected panic occurred: %v", r)
+				t.Errorf("Unexpected panic occurred: %v", r)
 			}
 		}()
 
-		// This will panic because viper.Get returns nil
+		// This should handle nil gracefully after the fix
 		state.logRefreshConnectionResults()
 
-		// If we get here without panic, the bug is fixed
-		t.Error("Expected panic did not occur - bug may be fixed")
+		// If we get here without panic, the fix is working
+		t.Log("Successfully handled nil value without panic")
 	})
 
 	// Test case 2: viper.Get returns wrong type
-	t.Run("wrong type causes panic", func(t *testing.T) {
+	t.Run("wrong type does not panic", func(t *testing.T) {
 		viper.Set(constants.ConfigKeyActiveCommand, "not-a-cobra-command")
 
 		state := &refreshConnectionState{}
 
-		// This should panic with the current unsafe type assertion
+		// After the fix, this should NOT panic
 		defer func() {
 			if r := recover(); r != nil {
-				t.Logf("Expected panic occurred: %v", r)
+				t.Errorf("Unexpected panic occurred: %v", r)
 			}
 		}()
 
-		// This will panic because type assertion fails
+		// This should handle wrong type gracefully after the fix
 		state.logRefreshConnectionResults()
 
-		// If we get here without panic, the bug is fixed
-		t.Error("Expected panic did not occur - bug may be fixed")
+		// If we get here without panic, the fix is working
+		t.Log("Successfully handled wrong type without panic")
 	})
 
 	// Test case 3: viper.Get returns *cobra.Command but it's nil
-	t.Run("nil cobra.Command pointer causes panic", func(t *testing.T) {
+	t.Run("nil cobra.Command pointer does not panic", func(t *testing.T) {
 		var nilCmd *cobra.Command
 		viper.Set(constants.ConfigKeyActiveCommand, nilCmd)
 
 		state := &refreshConnectionState{}
 
-		// This should panic when calling .Name() on nil pointer
+		// After the fix, this should NOT panic
 		defer func() {
 			if r := recover(); r != nil {
-				t.Logf("Expected panic occurred: %v", r)
+				t.Errorf("Unexpected panic occurred: %v", r)
 			}
 		}()
 
-		// This will panic on .Name() call
+		// This should handle nil cobra.Command gracefully after the fix
 		state.logRefreshConnectionResults()
 
-		// If we get here without panic, the bug is fixed
-		t.Error("Expected panic did not occur - bug may be fixed")
+		// If we get here without panic, the fix is working
+		t.Log("Successfully handled nil cobra.Command pointer without panic")
 	})
 
 	// Test case 4: Valid cobra.Command (should work)
