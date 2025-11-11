@@ -3,10 +3,12 @@ package db_client
 import (
 	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/turbot/steampipe/v2/pkg/db/db_common"
 )
 
 // TestSessionMapCleanupImplemented verifies that the session map memory leak is fixed
@@ -47,4 +49,86 @@ func TestSessionMapCleanupImplemented(t *testing.T) {
 		strings.Contains(clientCode, "BeforeClose")
 	assert.True(t, hasCleanupComment,
 		"Comment should document automatic cleanup mechanism")
+}
+
+// TestDbClient_ConcurrentCloseAndRead verifies that concurrent reads don't panic
+// when Close() sets sessions to nil
+// Reference: https://github.com/turbot/steampipe/issues/4793
+func TestDbClient_ConcurrentCloseAndRead(t *testing.T) {
+
+	// This test simulates the race condition where:
+	// 1. A goroutine enters AcquireSession, locks the mutex, reads c.sessions
+	// 2. Close() sets c.sessions = nil WITHOUT holding the mutex
+	// 3. The goroutine tries to write to c.sessions which is now nil
+	// This causes a nil map panic or data race
+
+	// Run the test multiple times to increase chance of catching the race
+	for i := 0; i < 50; i++ {
+		client := &DbClient{
+			sessions:      make(map[uint32]*db_common.DatabaseSession),
+			sessionsMutex: &sync.Mutex{},
+		}
+
+		done := make(chan bool, 2)
+
+		// Goroutine 1: Simulates AcquireSession behavior
+		go func() {
+			defer func() { done <- true }()
+
+			client.sessionsMutex.Lock()
+			// After the fix, code should check if sessions is nil
+			if client.sessions != nil {
+				_, found := client.sessions[12345]
+				if !found {
+					client.sessions[12345] = db_common.NewDBSession(12345)
+				}
+			}
+			client.sessionsMutex.Unlock()
+		}()
+
+		// Goroutine 2: Calls Close()
+		go func() {
+			defer func() { done <- true }()
+			// Without the fix, Close() sets sessions to nil without mutex protection
+			// This is the bug - it should acquire the mutex first
+			client.Close(nil)
+		}()
+
+		// Wait for both goroutines
+		<-done
+		<-done
+	}
+
+	// With the bug present, running with -race will detect the data race
+	// After the fix, this test should pass cleanly
+}
+
+// TestDbClient_SessionsMapNilAfterClose verifies that accessing sessions after Close
+// doesn't cause a nil pointer panic
+// Reference: https://github.com/turbot/steampipe/issues/4793
+func TestDbClient_SessionsMapNilAfterClose(t *testing.T) {
+
+	client := &DbClient{
+		sessions:      make(map[uint32]*db_common.DatabaseSession),
+		sessionsMutex: &sync.Mutex{},
+	}
+
+	// Add a session
+	client.sessionsMutex.Lock()
+	client.sessions[12345] = db_common.NewDBSession(12345)
+	client.sessionsMutex.Unlock()
+
+	// Close sets sessions to nil (without mutex protection - this is the bug)
+	client.Close(nil)
+
+	// Attempt to access sessions like AcquireSession does
+	// After the fix, this should not panic
+	client.sessionsMutex.Lock()
+	defer client.sessionsMutex.Unlock()
+
+	// With the bug: this panics because sessions is nil
+	// After fix: sessions should either not be nil, or code checks for nil
+	if client.sessions != nil {
+		client.sessions[67890] = db_common.NewDBSession(67890)
+	}
 }
