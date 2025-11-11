@@ -13,7 +13,7 @@ import (
 //
 // Bug: #4811
 func TestQueryHistory_BoundedSize(t *testing.T) {
-	t.Skip("Test demonstrates bug #4811: query history grows unbounded in memory during session")
+	// t.Skip("Test demonstrates bug #4811: query history grows unbounded in memory during session")
 
 	// Simulate a scenario where history is pre-populated (e.g., from a corrupted file or direct manipulation)
 	// This represents the in-memory history during a long-running session
