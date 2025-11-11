@@ -17,13 +17,16 @@ func getQueryInfo(text string) *queryCompletionInfo {
 
 	return &queryCompletionInfo{
 		Table:        table,
-		EditingTable: isEditingTable(prevWord),
+		EditingTable: isEditingTable(text, prevWord),
 	}
 }
 
-func isEditingTable(prevWord string) bool {
-	var editingTable = prevWord == "from"
-	return editingTable
+func isEditingTable(text string, prevWord string) bool {
+	// We're editing a table if:
+	// 1. The previous word is "from"
+	// 2. AND the text ends with a space (meaning cursor is after "from " ready for input)
+	// If text doesn't end with space, we're already typing the table name
+	return prevWord == "from" && strings.HasSuffix(text, " ")
 }
 
 func getTable(text string) string {
@@ -41,19 +44,32 @@ func getTable(text string) string {
 }
 
 func getPreviousWord(text string) string {
-	// create a new document up the previous space
+	// If text ends with space(s), we want the word immediately before those spaces
+	// e.g., "from " should return "from"
+	// e.g., "select * from " should return "from"
+
+	// First, find the last space
 	finalSpace := strings.LastIndex(text, " ")
 	if finalSpace == -1 {
 		return ""
 	}
+
+	// Find the last non-space character before that final space
 	lastNotSpace := lastIndexByteNot(text[:finalSpace], ' ')
 	if lastNotSpace == -1 {
+		// No non-space character before the final space means text is all spaces
 		return ""
 	}
-	prevSpace := strings.LastIndex(text[:lastNotSpace], " ")
+
+	// Find the space before the last word (if any)
+	prevSpace := strings.LastIndex(text[:lastNotSpace+1], " ")
 	if prevSpace == -1 {
-		return ""
+		// No space before means the last word starts at the beginning
+		// Return from start to lastNotSpace
+		return text[0 : lastNotSpace+1]
 	}
+
+	// Return the word between prevSpace and lastNotSpace
 	return text[prevSpace+1 : lastNotSpace+1]
 }
 
