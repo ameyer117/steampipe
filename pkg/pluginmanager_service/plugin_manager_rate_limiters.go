@@ -59,6 +59,8 @@ func (m *PluginManager) refreshRateLimiterTable(ctx context.Context) error {
 		introspection.GetRateLimiterTableGrantSql(),
 	}
 
+	// Fix #4786: Protect reads from m.pluginLimiters and m.userLimiters with mutex
+	m.mut.RLock()
 	for _, limitersForPlugin := range m.pluginLimiters {
 		for _, l := range limitersForPlugin {
 			queries = append(queries, introspection.GetRateLimiterTablePopulateSql(l))
@@ -70,6 +72,7 @@ func (m *PluginManager) refreshRateLimiterTable(ctx context.Context) error {
 			queries = append(queries, introspection.GetRateLimiterTablePopulateSql(l))
 		}
 	}
+	m.mut.RUnlock()
 
 	conn, err := m.pool.Acquire(ctx)
 	if err != nil {
@@ -92,8 +95,10 @@ func (m *PluginManager) handleUserLimiterChanges(_ context.Context, plugins conn
 		return nil
 	}
 
-	// update stored limiters to the new map
+	// Fix #4786: Protect write to m.userLimiters with mutex
+	m.mut.Lock()
 	m.userLimiters = limiterPluginMap
+	m.mut.Unlock()
 
 	// update the steampipe_plugin_limiters table
 	if err := m.refreshRateLimiterTable(context.Background()); err != nil {
@@ -138,6 +143,8 @@ func (m *PluginManager) setRateLimitersForPlugin(pluginShortName string) error {
 func (m *PluginManager) getPluginsWithChangedLimiters(newLimiters connection.PluginLimiterMap) map[string]struct{} {
 	var pluginsWithChangedLimiters = make(map[string]struct{})
 
+	// Fix #4786: Protect read from m.userLimiters with mutex
+	m.mut.RLock()
 	for plugin, limitersForPlugin := range m.userLimiters {
 		newLimitersForPlugin := newLimiters[plugin]
 		if !limitersForPlugin.Equals(newLimitersForPlugin) {
@@ -151,6 +158,7 @@ func (m *PluginManager) getPluginsWithChangedLimiters(newLimiters connection.Plu
 			pluginsWithChangedLimiters[plugin] = struct{}{}
 		}
 	}
+	m.mut.RUnlock()
 	return pluginsWithChangedLimiters
 }
 
@@ -176,6 +184,8 @@ func (m *PluginManager) updateRateLimiterStatus() {
 }
 
 func (m *PluginManager) getUserDefinedLimitersForPlugin(plugin string) connection.LimiterMap {
+	// Note: This function must be called while holding m.mut lock
+	// (either read or write lock depending on the caller)
 	userDefinedLimiters := m.userLimiters[plugin]
 	if userDefinedLimiters == nil {
 		userDefinedLimiters = make(connection.LimiterMap)
