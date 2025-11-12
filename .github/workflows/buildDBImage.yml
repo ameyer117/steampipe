@@ -18,7 +18,7 @@ on:
 env:
   PROJECT_ID: steampipe
   IMAGE_NAME: db
-  CORE_REPO: ghcr.io/turbot/steampipe
+  CORE_REPO: ghcr.io/${{ github.repository_owner }}/steampipe
   ORG: turbot
   CONFIG_SCHEMA_VERSION: "2020-11-18"
   VERSION: ${{ github.event.inputs.version }}
