@@ -1,6 +1,5 @@
 name: Build and Publish DB Image
 
-# Controls when the action will run.
 on:
   workflow_dispatch:
     inputs:
@@ -9,12 +8,12 @@ on:
           Version number for the OCI image for this release - usually the same as the
           postgres version
         required: true
-        default: 14.17.0
+        default: 14.19.0
 
       postgres_version:
-        description: "Postgres Version to package (eg 14.2.0)"
+        description: "Postgres Version to package (eg 14.19.0)"
         required: true
-        default: 14.17.0
+        default: 14.19.0
 
 env:
   PROJECT_ID: steampipe
@@ -30,32 +29,29 @@ env:
   ORAS_VERSION: 1.1.0
 
 jobs:
-  # This workflow contains a single job called "build"
   build:
     name: Build and Publish DB Image
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
-    # Steps represent a sequence of tasks that will be executed as part of the job
+
     steps:
       - name: Trim asset version prefix and Validate
         run: |-
-          echo $VERSION
+          echo "$VERSION"
           trim=${VERSION#"v"}
-          echo $trim
+          echo "$trim"
           if [[ $trim =~  ^[0-9]+\.[0-9]+\.[0-9]+(-.+)?$ ]]; then
             echo "Version OK: $trim"
           else
             echo "Invalid version: $trim"
             exit 1
           fi
-          echo "VERSION=${trim}" >> $GITHUB_ENV
+          echo "VERSION=${trim}" >> "$GITHUB_ENV"
 
       - name: Ensure Version Does Not Exist
         run: |-
-
-          URL=https://$(echo $CORE_REPO | sed 's/\//\/v2\//')/$IMAGE_NAME/tags/list
-          IDX=$(curl -L $URL | jq ".tags | index(\"$VERSION\")")
-          if [ $IDX == "null" ]; then
+          URL=https://$(echo "$CORE_REPO" | sed 's/\//\/v2\//')/"$IMAGE_NAME"/tags/list
+          IDX=$(curl -Ls "$URL" | jq ".tags | index(\"$VERSION\")")
+          if [ "$IDX" == "null" ]; then
             echo "OK - Version does not exist: $VERSION"
           else
             echo "Version already exists: $VERSION"
@@ -67,6 +63,11 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch }}
 
+      - name: Install unzip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip
+
       # Login to GHCR
       - name: Log in to the Container registry
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
@@ -75,37 +76,89 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GH_PUBLISH_ACCESS_TOKEN }}
 
-      - name: Pull & Extract - darwin amd64
+      # Darwin AMD64 from Zonky
+      - name: Pull & Extract - darwin amd64 (from Zonky)
         run: |-
           EXTRACT_DIR=extracted-darwin-amd64
-          # new link (darwin-amd64.txz) - https://drive.google.com/file/d/12fxd_jZxdP4Ilwd0BnefbVCLZV957TNJ/view?usp=drive_link
-          curl -L -o darwin-amd64.txz "https://drive.google.com/uc?export=download&id=12fxd_jZxdP4Ilwd0BnefbVCLZV957TNJ"
-          mkdir $EXTRACT_DIR
-          tar -xf darwin-amd64.txz --directory $EXTRACT_DIR
+          mkdir "$EXTRACT_DIR"
 
-      - name: Pull & Extract - darwin arm64
+          ARTIFACT_ID="${NAME_PREFIX}-darwin-amd64"
+          JAR_NAME="${ARTIFACT_ID}-${PG_VERSION}.jar"
+          JAR_URL="${PATH_BASE}/${ARTIFACT_ID}/${PG_VERSION}/${JAR_NAME}"
+
+          echo "Downloading ${JAR_URL}"
+          curl -L -o "${JAR_NAME}" "${JAR_URL}"
+
+          mkdir -p tmp-darwin-amd64
+          unzip -j "${JAR_NAME}" '*.txz' -d tmp-darwin-amd64
+
+          TXZ_FILE=$(ls tmp-darwin-amd64/*.txz)
+          echo "Using archive ${TXZ_FILE}"
+
+          tar -xf "${TXZ_FILE}" --directory "${EXTRACT_DIR}"
+
+      # Darwin ARM64 from Zonky
+      - name: Pull & Extract - darwin arm64 (from Zonky)
         run: |-
           EXTRACT_DIR=extracted-darwin-arm64
-          # new link (darwin-arm64.txz) - https://drive.google.com/file/d/1lG6eNYM5JaywbRxQBubzMDmbCtGVilQh/view?usp=drive_link
-          curl -L -o darwin-arm64.txz "https://drive.google.com/uc?export=download&id=1lG6eNYM5JaywbRxQBubzMDmbCtGVilQh"
-          mkdir $EXTRACT_DIR
-          tar -xf darwin-arm64.txz --directory $EXTRACT_DIR
+          mkdir "$EXTRACT_DIR"
 
-      - name: Pull & Extract - linux amd64
+          ARTIFACT_ID="${NAME_PREFIX}-darwin-arm64v8"
+          JAR_NAME="${ARTIFACT_ID}-${PG_VERSION}.jar"
+          JAR_URL="${PATH_BASE}/${ARTIFACT_ID}/${PG_VERSION}/${JAR_NAME}"
+
+          echo "Downloading ${JAR_URL}"
+          curl -L -o "${JAR_NAME}" "${JAR_URL}"
+
+          mkdir -p tmp-darwin-arm64
+          unzip -j "${JAR_NAME}" '*.txz' -d tmp-darwin-arm64
+
+          TXZ_FILE=$(ls tmp-darwin-arm64/*.txz)
+          echo "Using archive ${TXZ_FILE}"
+
+          tar -xf "${TXZ_FILE}" --directory "${EXTRACT_DIR}"
+
+      # Linux AMD64 from Zonky
+      - name: Pull & Extract - linux amd64 (from Zonky)
         run: |-
           EXTRACT_DIR=extracted-linux-amd64
-          # new link (linux-amd64.txz) - https://drive.google.com/file/d/11pqDcTtlD7RF5LPj-X4gRVfl4mk00fuy/view?usp=drive_link
-          curl -L -o linux-amd64.txz "https://drive.google.com/uc?export=download&id=11pqDcTtlD7RF5LPj-X4gRVfl4mk00fuy"
-          mkdir $EXTRACT_DIR
-          tar -xf linux-amd64.txz --directory $EXTRACT_DIR
+          mkdir "$EXTRACT_DIR"
 
-      - name: Pull & Extract - linux arm64
+          ARTIFACT_ID="${NAME_PREFIX}-linux-amd64"
+          JAR_NAME="${ARTIFACT_ID}-${PG_VERSION}.jar"
+          JAR_URL="${PATH_BASE}/${ARTIFACT_ID}/${PG_VERSION}/${JAR_NAME}"
+
+          echo "Downloading ${JAR_URL}"
+          curl -L -o "${JAR_NAME}" "${JAR_URL}"
+
+          mkdir -p tmp-linux-amd64
+          unzip -j "${JAR_NAME}" '*.txz' -d tmp-linux-amd64
+
+          TXZ_FILE=$(ls tmp-linux-amd64/*.txz)
+          echo "Using archive ${TXZ_FILE}"
+
+          tar -xf "${TXZ_FILE}" --directory "${EXTRACT_DIR}"
+
+      # Linux ARM64 from Zonky
+      - name: Pull & Extract - linux arm64 (from Zonky)
         run: |-
           EXTRACT_DIR=extracted-linux-arm64
-          # new link (linux-arm64.txz) - https://drive.google.com/file/d/1lpjyHegwd_8574uVWgaPB31yR7vRB8Zh/view?usp=drive_link
-          curl -L -o linux-arm64.txz "https://drive.google.com/uc?export=download&id=1lpjyHegwd_8574uVWgaPB31yR7vRB8Zh"
-          mkdir $EXTRACT_DIR
-          tar -xf linux-arm64.txz --directory $EXTRACT_DIR
+          mkdir "$EXTRACT_DIR"
+
+          ARTIFACT_ID="${NAME_PREFIX}-linux-arm64v8"
+          JAR_NAME="${ARTIFACT_ID}-${PG_VERSION}.jar"
+          JAR_URL="${PATH_BASE}/${ARTIFACT_ID}/${PG_VERSION}/${JAR_NAME}"
+
+          echo "Downloading ${JAR_URL}"
+          curl -L -o "${JAR_NAME}" "${JAR_URL}"
+
+          mkdir -p tmp-linux-arm64
+          unzip -j "${JAR_NAME}" '*.txz' -d tmp-linux-arm64
+
+          TXZ_FILE=$(ls tmp-linux-arm64/*.txz)
+          echo "Using archive ${TXZ_FILE}"
+
+          tar -xf "${TXZ_FILE}" --directory "${EXTRACT_DIR}"
 
       - name: Build Config JSON
         run: |-
@@ -117,7 +170,7 @@ jobs:
             --arg dbVersion "$PG_VERSION" \
             '{schemaVersion: $schemaVersion, db: { name: $name, organization: $organization, version: $version, dbVersion: $dbVersion} }' )
 
-          echo $JSON_STRING > config.json
+          echo "$JSON_STRING" > config.json
 
       - name: Build Annotations JSON
         run: |-
@@ -137,21 +190,19 @@ jobs:
                 }
             }' )
 
-            echo $JSON_STRING > annotations.json
+          echo "$JSON_STRING" > annotations.json
 
-      # Setup ORAS
       - name: Install specific version of ORAS
         run: |
-          curl -LO https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_amd64.tar.gz
-          sudo tar xzf oras_${ORAS_VERSION}_linux_amd64.tar.gz -C /usr/local/bin oras
+          curl -LO "https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_amd64.tar.gz"
+          sudo tar xzf "oras_${ORAS_VERSION}_linux_amd64.tar.gz" -C /usr/local/bin oras
           oras version
 
-      # Publish to GHCR
       - name: Push to Registry
         run: |-
           REF="$CORE_REPO/$IMAGE_NAME:$VERSION"
 
-          oras push $REF \
+          oras push "$REF" \
               --config config.json:application/vnd.turbot.steampipe.config.v1+json \
               --annotation-file annotations.json \
               extracted-darwin-amd64:application/vnd.turbot.steampipe.db.darwin-amd64.layer.v1+tar \
