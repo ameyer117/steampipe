@@ -13,7 +13,7 @@ env:
   CONFIG_SCHEMA_VERSION: "2020-11-18"
   VERSION: ${{ github.event.inputs.version }}
   STEAMPIPE_UPDATE_CHECK: false
-  GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
 
@@ -118,4 +118,4 @@ jobs:
         cd steampipe
         goreleaser release --clean
       env:
-        GITHUB_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
