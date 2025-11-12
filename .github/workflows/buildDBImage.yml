@@ -74,7 +74,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GH_PUBLISH_ACCESS_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       # Darwin AMD64 from Zonky
       - name: Pull & Extract - darwin amd64 (from Zonky)
