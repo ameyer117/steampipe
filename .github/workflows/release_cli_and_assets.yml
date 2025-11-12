@@ -76,7 +76,23 @@ jobs:
     name: Build and Release CLI
     needs: [create_release_tag]
     runs-on: ubuntu-latest
+
+    # Run the build inside a RHEL8-compatible container (glibc 2.28)
+    container:
+      image: rockylinux:8
+
+    # Ensure bash is used (container jobs default to /bin/sh)
+    defaults:
+      run:
+        shell: bash
+
     steps:
+    # We need git (for checkout) and basic tools inside the container
+    - name: Install base packages
+      run: |
+        dnf -y install git ca-certificates
+        dnf -y clean all
+
     - name: Trim asset version prefix and Validate
       run: |-
         echo $VERSION
