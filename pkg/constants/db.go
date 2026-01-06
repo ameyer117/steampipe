@@ -27,7 +27,7 @@ const (
 
 // constants for installing db and fdw images
 const (
-	DatabaseVersion = "14.19.0"
+	DatabaseVersion = "14.20.0"
 	FdwVersion      = "1.12.5"
 
 	// PostgresImageRef is the OCI Image ref for the database binaries
