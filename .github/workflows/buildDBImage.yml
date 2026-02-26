@@ -8,12 +8,12 @@ on:
           Version number for the OCI image for this release - usually the same as the
           postgres version
         required: true
-        default: 14.20.0
+        default: 14.22.0
 
       postgres_version:
         description: "Postgres Version to package (eg 14.19.0)"
         required: true
-        default: 14.20.0
+        default: 14.22.0
 
 env:
   PROJECT_ID: steampipe
