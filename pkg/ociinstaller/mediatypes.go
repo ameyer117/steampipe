@@ -20,7 +20,10 @@ const (
 	MediaTypeAssetReportLayer = "application/vnd.turbot.steampipe.assets.report.layer.v1+tar"
 )
 
-type SteampipeMediaTypeProvider struct{}
+type SteampipeMediaTypeProvider struct {
+	TargetArch string
+	TargetOS   string
+}
 
 func (p SteampipeMediaTypeProvider) GetAllMediaTypes(imageType ociinstaller.ImageType) ([]string, error) {
 	m, err := p.MediaTypeForPlatform(imageType)
@@ -34,29 +37,38 @@ func (p SteampipeMediaTypeProvider) GetAllMediaTypes(imageType ociinstaller.Imag
 
 // MediaTypeForPlatform returns media types for binaries for this OS and architecture
 // and it's fallbacks in order of priority
-func (SteampipeMediaTypeProvider) MediaTypeForPlatform(imageType ociinstaller.ImageType) ([]string, error) {
+func (p SteampipeMediaTypeProvider) MediaTypeForPlatform(imageType ociinstaller.ImageType) ([]string, error) {
 	layerFmtGzip := "application/vnd.turbot.steampipe.%s.%s-%s.layer.v1+gzip"
 	layerFmtTar := "application/vnd.turbot.steampipe.%s.%s-%s.layer.v1+tar"
-
+	osName := runtime.GOOS
 	arch := runtime.GOARCH
+	if p.TargetOS != "" {
+		osName = p.TargetOS
+	}
+	if p.TargetArch != "" {
+		arch = p.TargetArch
+	}
 	switch imageType {
 	case ImageTypeDatabase:
-		return []string{fmt.Sprintf(layerFmtTar, imageType, runtime.GOOS, arch)}, nil
+		return []string{fmt.Sprintf(layerFmtTar, imageType, osName, arch)}, nil
 	case ImageTypeFdw:
-		// detect the underlying architecture(amd64/arm64)
-		// we have to do this rather than just using runtime.GOARCH, because runtime.GOARCH does not give us
-		// the actual underlying architecture of the system(GOARCH can be changed during runtime)
-		arch, err := utils.UnderlyingArch()
-		if err != nil {
-			return nil, err
+		if p.TargetArch == "" {
+			// detect the underlying architecture(amd64/arm64)
+			// we have to do this rather than just using runtime.GOARCH, because runtime.GOARCH does not give us
+			// the actual underlying architecture of the system(GOARCH can be changed during runtime)
+			detectedArch, err := utils.UnderlyingArch()
+			if err != nil {
+				return nil, err
+			}
+			arch = detectedArch
 		}
-		return []string{fmt.Sprintf(layerFmtGzip, imageType, runtime.GOOS, arch)}, nil
+		return []string{fmt.Sprintf(layerFmtGzip, imageType, osName, arch)}, nil
 	case ociinstaller.ImageTypePlugin:
-		pluginMediaTypes := []string{fmt.Sprintf(layerFmtGzip, imageType, runtime.GOOS, arch)}
-		if runtime.GOOS == constants.OSDarwin && arch == constants.ArchARM64 {
+		pluginMediaTypes := []string{fmt.Sprintf(layerFmtGzip, imageType, osName, arch)}
+		if osName == constants.OSDarwin && arch == constants.ArchARM64 {
 			// add the amd64 layer as well, so that we can fall back to it
 			// this is required for plugins which don't have an arm64 build yet
-			pluginMediaTypes = append(pluginMediaTypes, fmt.Sprintf(layerFmtGzip, imageType, runtime.GOOS, constants.ArchAMD64))
+			pluginMediaTypes = append(pluginMediaTypes, fmt.Sprintf(layerFmtGzip, imageType, osName, constants.ArchAMD64))
 		}
 		return pluginMediaTypes, nil
 	}

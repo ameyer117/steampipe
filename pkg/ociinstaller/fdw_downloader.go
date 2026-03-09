@@ -17,10 +17,14 @@ func (p *fdwDownloader) EmptyConfig() *FdwImageConfig {
 }
 
 func newFdwDownloader() *fdwDownloader {
+	return newFdwDownloaderForProvider(SteampipeMediaTypeProvider{})
+}
+
+func newFdwDownloaderForProvider(provider SteampipeMediaTypeProvider) *fdwDownloader {
 	res := &fdwDownloader{}
 
 	// create the base downloader, passing res as the image provider
-	ociDownloader := ociinstaller.NewOciDownloader[*fdwImage, *FdwImageConfig](constants.BaseImageRef, SteampipeMediaTypeProvider{}, res)
+	ociDownloader := ociinstaller.NewOciDownloader[*fdwImage, *FdwImageConfig](constants.BaseImageRef, provider, res)
 
 	res.OciDownloader = *ociDownloader
 

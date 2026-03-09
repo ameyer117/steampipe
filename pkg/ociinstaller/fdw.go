@@ -6,13 +6,10 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/turbot/pipe-fittings/v2/ociinstaller"
-	putils "github.com/turbot/pipe-fittings/v2/utils"
 	"github.com/turbot/steampipe/pkg/constants"
 	"github.com/turbot/steampipe/pkg/filepaths"
-	"github.com/turbot/steampipe/pkg/ociinstaller/versionfile"
 )
 
 // InstallFdw installs the Steampipe Postgres foreign data wrapper from an OCI image
@@ -37,26 +34,15 @@ func InstallFdw(ctx context.Context, dbLocation string) (string, error) {
 		return "", err
 	}
 
-	if err := updateVersionFileFdw(image); err != nil {
+	if err := updateVersionFileFdw(installedImageDetails{
+		version:       image.Config.Fdw.Version,
+		imageDigest:   string(image.OCIDescriptor.Digest),
+		installedFrom: image.ImageRef.RequestedRef,
+	}); err != nil {
 		return string(image.OCIDescriptor.Digest), err
 	}
 
 	return string(image.OCIDescriptor.Digest), nil
-}
-
-func updateVersionFileFdw(image *ociinstaller.OciImage[*fdwImage, *FdwImageConfig]) error {
-	timeNow := putils.FormatTime(time.Now())
-	v, err := versionfile.LoadDatabaseVersionFile()
-	if err != nil {
-		return err
-	}
-	v.FdwExtension.Version = image.Config.Fdw.Version
-	v.FdwExtension.Name = "fdwExtension"
-	v.FdwExtension.ImageDigest = string(image.OCIDescriptor.Digest)
-	v.FdwExtension.InstalledFrom = image.ImageRef.RequestedRef
-	v.FdwExtension.LastCheckedDate = timeNow
-	v.FdwExtension.InstallDate = timeNow
-	return v.Save()
 }
 
 func installFdwFiles(image *ociinstaller.OciImage[*fdwImage, *FdwImageConfig], tempdir string) error {

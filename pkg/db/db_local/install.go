@@ -133,11 +133,15 @@ func downloadAndInstallDbFiles(ctx context.Context) error {
 		return fmt.Errorf("Prepare database install location... FAILED!")
 	}
 
-	statushooks.SetStatus(ctx, "Download & install embedded PostgreSQL database…")
-	_, err = ociinstaller.InstallDB(ctx, filepaths.GetDatabaseLocation())
+	statushooks.SetStatus(ctx, "Install embedded PostgreSQL database…")
+	if ociinstaller.BundledDBAvailable() {
+		_, err = ociinstaller.InstallDBFromBundle(constants.EmbeddedDBAssetsDir(), filepaths.GetDatabaseLocation())
+	} else {
+		_, err = ociinstaller.InstallDB(ctx, filepaths.GetDatabaseLocation())
+	}
 	if err != nil {
 		log.Printf("[TRACE] %v", err)
-		return fmt.Errorf("Download & install embedded PostgreSQL database... FAILED!")
+		return fmt.Errorf("Install embedded PostgreSQL database... FAILED!")
 	}
 	return nil
 }
@@ -248,7 +252,10 @@ func installFDW(ctx context.Context, firstSetup bool) (string, error) {
 			}
 		}()
 	}
-	statushooks.SetStatus(ctx, fmt.Sprintf("Download & install %s…", pconstants.Bold("steampipe-postgres-fdw")))
+	statushooks.SetStatus(ctx, fmt.Sprintf("Install %s…", pconstants.Bold("steampipe-postgres-fdw")))
+	if ociinstaller.BundledFDWAvailable() {
+		return ociinstaller.InstallFdwFromBundle(constants.EmbeddedFDWAssetsDir())
+	}
 	return ociinstaller.InstallFdw(ctx, filepaths.GetDatabaseLocation())
 }
 

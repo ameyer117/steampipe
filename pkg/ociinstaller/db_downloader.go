@@ -17,10 +17,14 @@ func (p *dbDownloader) EmptyConfig() *dbImageConfig {
 }
 
 func newDbDownloader() *dbDownloader {
+	return newDbDownloaderForProvider(SteampipeMediaTypeProvider{})
+}
+
+func newDbDownloaderForProvider(provider SteampipeMediaTypeProvider) *dbDownloader {
 	res := &dbDownloader{}
 
 	// create the base downloader, passing res as the image provider
-	ociDownloader := ociinstaller.NewOciDownloader[*dbImage, *dbImageConfig](constants.BaseImageRef, SteampipeMediaTypeProvider{}, res)
+	ociDownloader := ociinstaller.NewOciDownloader[*dbImage, *dbImageConfig](constants.BaseImageRef, provider, res)
 
 	res.OciDownloader = *ociDownloader
 

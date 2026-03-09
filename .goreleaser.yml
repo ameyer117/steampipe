@@ -17,6 +17,9 @@ builds:
     id: "steampipe"
     binary:
       'steampipe'
+    hooks:
+      post:
+        - cmd: go run ./scripts/stage_embedded_assets --os {{ .Os }} --arch {{ .Arch }} --output ./dist/embedded/{{ .Os }}_{{ .Arch }}
 archives:
   - files:
     - none*
@@ -37,6 +40,15 @@ nfpms:
     maintainer: "Turbot Support <help@turbot.com>"
     description: "Use SQL to instantly query your cloud services (AWS, Azure, GCP and more). Open source CLI. No DB required."
     file_name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    contents:
+      - src: ./dist/embedded/{{ .Os }}_{{ .Arch }}/db
+        dst: /usr/share/steampipe/embedded/db
+        type: tree
+        packager: rpm
+      - src: ./dist/embedded/{{ .Os }}_{{ .Arch }}/fdw
+        dst: /usr/share/steampipe/embedded/fdw
+        type: tree
+        packager: rpm
     rpm:
       summary: "Use SQL to instantly query your cloud services (AWS, Azure, GCP and more). Open source CLI. No DB required."
 
