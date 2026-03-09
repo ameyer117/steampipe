@@ -19,5 +19,5 @@ type dbImageConfig struct {
 		Organization string `json:"organization,omitempty"`
 		Version      string `json:"version"`
 		DBVersion    string `json:"dbVersion,omitempty"`
-	}
+	} `json:"db"`
 }
